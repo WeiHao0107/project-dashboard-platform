@@ -75,7 +75,7 @@
                 <template v-else>{{ row[col.key] }}</template>
               </template>
               <template #footer>
-                <span v-if="col.key === 'name'" class="foot-label">Total</span>
+                <span v-if="col.key === 'member'" class="foot-label">Total</span>
                 <b v-else-if="col.type === 'number'">{{ colSum(col.key) }}</b>
               </template>
             </Column>
