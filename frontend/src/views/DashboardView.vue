@@ -4,19 +4,10 @@
       :projects="projects"
       :loading="loading"
       :error="error"
-      :selected-project-key="selectedProjectKey"
-      :selected-page-id="selectedPageId"
-      @select-project="onSelectProject"
-      @select-page="onSelectPage"
     />
 
     <main class="main">
-      <component
-        v-if="currentPageComponent && selectedProjectKey"
-        :is="currentPageComponent"
-        :project-key="selectedProjectKey"
-        :key="selectedProjectKey + '-' + selectedPageId"
-      />
+      <RouterView v-if="$route.params.projectKey" />
       <div v-else class="empty-state">
         <div class="empty-icon">📊</div>
         <p>Select a project and page from the sidebar</p>
@@ -26,19 +17,12 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import ProjectSidebar        from '../components/sidebar/ProjectSidebar.vue'
-import IssueTrendPage        from '../pages/IssueTrendPage.vue'
-import MemberPerformancePage from '../pages/MemberPerformancePage.vue'
-import { api }               from '../api/index.js'
+import { ref, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import ProjectSidebar from '../components/sidebar/ProjectSidebar.vue'
+import { api } from '../api/index.js'
 
-// ── page key → component mapping ─────────────────────────
-const PAGE_MAP = {
-  'issue-trend':        IssueTrendPage,
-  'member-performance': MemberPerformancePage,
-}
-
-// ── projects ──────────────────────────────────────────────
+const router   = useRouter()
 const projects = ref([])
 const loading  = ref(false)
 const error    = ref(null)
@@ -56,30 +40,12 @@ async function fetchProjects() {
 
 onMounted(fetchProjects)
 
-// Auto-select first project once loaded
+// Auto-navigate to first project's first page when no route is active yet
 watch(projects, (list) => {
-  if (list.length > 0 && !selectedProjectKey.value) {
-    selectedProjectKey.value = list[0].key
+  if (list.length > 0 && !router.currentRoute.value.params.projectKey) {
+    router.replace({ name: 'issue-trend', params: { projectKey: list[0].key } })
   }
 })
-
-// ── selection state ───────────────────────────────────────
-const selectedProjectKey = ref(null)
-const selectedPageId     = ref(null)
-
-function onSelectProject(key) {
-  if (selectedProjectKey.value === key) return
-  selectedProjectKey.value = key
-  selectedPageId.value     = null
-}
-
-function onSelectPage(pageId) {
-  selectedPageId.value = pageId
-}
-
-const currentPageComponent = computed(() =>
-  selectedPageId.value ? (PAGE_MAP[selectedPageId.value] ?? null) : null
-)
 </script>
 
 <style scoped>

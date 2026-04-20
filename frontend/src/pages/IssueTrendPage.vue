@@ -171,18 +171,23 @@ function buildOption(d) {
 
 const ro = new ResizeObserver(() => chart?.resize())
 
-onMounted(async () => {
-  await nextTick()
-  if (chartEl.value) { chart = echarts.init(chartEl.value); ro.observe(chartEl.value) }
+// Init chart and render whenever the canvas div enters the DOM
+// (happens after loading spinner disappears, which may be after onMounted)
+watch(chartEl, (el) => {
+  if (!el) { chart?.dispose(); chart = null; return }
+  if (!chart) { chart = echarts.init(el); ro.observe(el) }
+  if (data.value?.series) chart.setOption(buildOption(data.value), true)
 })
-onBeforeUnmount(() => { ro.disconnect(); chart?.dispose() })
 
+// Re-render whenever data changes (chart may or may not exist yet)
 watch(data, async (val) => {
   if (!val?.series) return
   await nextTick()
-  if (!chart && chartEl.value) chart = echarts.init(chartEl.value)
+  if (!chart && chartEl.value) { chart = echarts.init(chartEl.value); ro.observe(chartEl.value) }
   chart?.setOption(buildOption(val), true)
 })
+
+onBeforeUnmount(() => { ro.disconnect(); chart?.dispose(); chart = null })
 </script>
 
 <style scoped>

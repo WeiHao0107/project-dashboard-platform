@@ -10,41 +10,41 @@
     <div class="section-label">Projects</div>
 
     <div v-if="loading" class="sidebar-hint">Loading...</div>
-    <div v-else-if="error"  class="sidebar-hint error">{{ error }}</div>
+    <div v-else-if="error" class="sidebar-hint error">{{ error }}</div>
 
     <nav v-else class="project-list">
       <button
         v-for="proj in projects"
         :key="proj.key"
         class="project-btn"
-        :class="{ active: selectedProjectKey === proj.key }"
+        :class="{ active: route.params.projectKey === proj.key }"
         @click="selectProject(proj.key)"
       >
         <span class="project-initial">{{ proj.name[0] }}</span>
         <span class="project-name">{{ proj.name }}</span>
-        <span v-if="selectedProjectKey === proj.key" class="project-check">✓</span>
+        <span v-if="route.params.projectKey === proj.key" class="project-check">✓</span>
       </button>
     </nav>
 
-    <!-- ── PAGE LIST (only shown when a project is selected) ── -->
-    <template v-if="selectedProjectKey && pages.length">
+    <!-- ── PAGE LIST ── -->
+    <template v-if="route.params.projectKey && pages.length">
       <div class="divider" />
       <div class="section-label">Pages</div>
       <nav class="page-list">
-        <button
+        <RouterLink
           v-for="page in pages"
           :key="page.pageId"
+          :to="{ name: page.pageId, params: { projectKey: route.params.projectKey } }"
           class="page-btn"
-          :class="{ active: selectedPageId === page.pageId }"
-          @click="$emit('select-page', page.pageId)"
+          active-class="active"
         >
           <span class="page-icon">{{ PAGE_ICONS[page.icon] ?? '📄' }}</span>
           {{ page.title }}
-        </button>
+        </RouterLink>
       </nav>
     </template>
 
-    <div v-else-if="selectedProjectKey && pagesLoading" class="sidebar-hint">
+    <div v-else-if="route.params.projectKey && pagesLoading" class="sidebar-hint">
       Loading pages...
     </div>
   </aside>
@@ -52,6 +52,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../api/index.js'
 
 const PAGE_ICONS = {
@@ -62,147 +63,92 @@ const PAGE_ICONS = {
 }
 
 const props = defineProps({
-  projects:           { type: Array,   default: () => [] },
-  loading:            { type: Boolean, default: false },
-  error:              { type: String,  default: null },
-  selectedProjectKey: { type: String,  default: null },
-  selectedPageId:     { type: String,  default: null },
+  projects: { type: Array,   default: () => [] },
+  loading:  { type: Boolean, default: false },
+  error:    { type: String,  default: null },
 })
 
-const emit = defineEmits(['select-project', 'select-page'])
+const route  = useRoute()
+const router = useRouter()
 
-const pages       = ref([])
+// ── Pages for current project ─────────────────────────────
+const pages        = ref([])
 const pagesLoading = ref(false)
 
-async function loadPages(key) {
-  if (!key) { pages.value = []; return }
+async function loadPages(projectKey) {
+  if (!projectKey) { pages.value = []; return }
   pagesLoading.value = true
   try {
-    pages.value = (await api.getPages(key)).data
-    // Auto-select first page
-    if (pages.value.length > 0 && !props.selectedPageId) {
-      emit('select-page', pages.value[0].pageId)
-    }
+    pages.value = (await api.getPages(projectKey)).data
   } finally {
     pagesLoading.value = false
   }
 }
 
-function selectProject(key) {
-  emit('select-project', key)
-}
+watch(() => route.params.projectKey, loadPages, { immediate: true })
 
-watch(() => props.selectedProjectKey, (key) => {
-  pages.value = []
-  loadPages(key)
-}, { immediate: true })
+// ── Project click → navigate to that project's first page ─
+function selectProject(key) {
+  if (route.params.projectKey === key) return
+  router.push({ name: 'issue-trend', params: { projectKey: key } })
+}
 </script>
 
 <style scoped>
 .sidebar {
-  width: 220px;
-  min-height: 100vh;
-  background: #1e2235;
-  color: #c8cde4;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  overflow-y: auto;
+  width: 220px; min-height: 100vh;
+  background: #1e2235; color: #c8cde4;
+  display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
 }
 
-/* Logo */
 .sidebar-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 16px 14px;
-  border-bottom: 1px solid #2d3250;
+  display: flex; align-items: center; gap: 10px;
+  padding: 18px 16px 14px; border-bottom: 1px solid #2d3250;
 }
 .logo-icon { font-size: 20px; }
 .logo-text  { font-size: 16px; font-weight: 700; color: #e8eaf6; }
 
-/* Section label */
 .section-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: #6b7399;
-  padding: 14px 16px 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; color: #6b7399; padding: 14px 16px 6px;
 }
 
-/* Project list */
 .project-list { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
 
 .project-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  background: none;
-  border: none;
-  border-radius: 7px;
-  color: #a8b0d0;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; background: none; border: none; border-radius: 7px;
+  color: #a8b0d0; font-size: 13px; font-weight: 500;
+  cursor: pointer; text-align: left; width: 100%;
   transition: background 0.15s, color 0.15s;
-  width: 100%;
 }
 .project-btn:hover  { background: #272d48; color: #e8eaf6; }
 .project-btn.active { background: #2d3460; color: #fff; font-weight: 600; }
 
 .project-initial {
-  width: 26px; height: 26px;
-  border-radius: 6px;
-  background: #3d4570;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: #9fa8da;
-  flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 6px; background: #3d4570;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #9fa8da; flex-shrink: 0;
 }
-.project-btn.active .project-initial {
-  background: #5c6bc0;
-  color: #fff;
-}
-.project-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-btn.active .project-initial { background: #5c6bc0; color: #fff; }
+.project-name  { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project-check { font-size: 11px; color: #7986cb; }
 
-/* Divider */
-.divider {
-  height: 1px;
-  background: #2d3250;
-  margin: 10px 0 0;
-}
+.divider { height: 1px; background: #2d3250; margin: 10px 0 0; }
 
-/* Page list */
 .page-list { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 12px; }
 
 .page-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  background: none;
-  border: none;
-  border-radius: 7px;
-  color: #8890b0;
-  font-size: 13px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s, color 0.15s;
-  width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: none; border: none; border-radius: 7px;
+  color: #8890b0; font-size: 13px; cursor: pointer; text-align: left;
+  text-decoration: none; transition: background 0.15s, color 0.15s; width: 100%;
 }
 .page-btn:hover  { background: #272d48; color: #e8eaf6; }
 .page-btn.active { background: #272d48; color: #9fa8da; font-weight: 600; }
 
 .page-icon { font-size: 14px; }
 
-/* Hints */
 .sidebar-hint { padding: 8px 16px; font-size: 12px; color: #6b7399; }
 .sidebar-hint.error { color: #e57373; }
 </style>
