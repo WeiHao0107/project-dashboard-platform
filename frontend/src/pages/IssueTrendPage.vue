@@ -10,35 +10,48 @@
     <div class="filter-bar">
       <div class="filter-field">
         <label class="filter-label">YEAR</label>
-        <select class="filter-select" v-model="year">
-          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-        </select>
+        <Select
+          v-model="year"
+          :options="yearOptions"
+          class="filter-select"
+        />
       </div>
       <div class="filter-field">
         <label class="filter-label">DEPARTMENT</label>
-        <select class="filter-select" v-model="departmentId">
-          <option :value="null">All Departments</option>
-          <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-        </select>
+        <Select
+          v-model="departmentId"
+          :options="departments"
+          option-label="name"
+          option-value="id"
+          placeholder="All Departments"
+          show-clear
+          class="filter-select"
+        />
       </div>
     </div>
 
     <!-- Chart -->
     <div class="page-body">
-      <div class="card">
-        <div class="card-title">Created vs Resolved Issues (Cumulative)</div>
-        <div v-if="loading" class="state-center">
-          <span class="spinner" /> Loading...
-        </div>
-        <div v-else-if="error" class="state-center state-error">{{ error }}</div>
-        <div v-else ref="chartEl" class="chart-area" />
-      </div>
+      <Card class="chart-card">
+        <template #title>Created vs Resolved Issues (Cumulative)</template>
+        <template #content>
+          <div v-if="loading" class="state-center">
+            <ProgressSpinner style="width:36px;height:36px" strokeWidth="4" />
+            <span>Loading...</span>
+          </div>
+          <div v-else-if="error" class="state-center state-error">{{ error }}</div>
+          <div v-else ref="chartEl" class="chart-area" />
+        </template>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, computed, onMounted, onBeforeUnmount, nextTick, toRef } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import Select         from 'primevue/select'
+import Card           from 'primevue/card'
+import ProgressSpinner from 'primevue/progressspinner'
 import * as echarts from 'echarts'
 import { api } from '../api/index.js'
 
@@ -189,32 +202,20 @@ watch(data, async (val) => {
   font-size: 10px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: #6b7399;
 }
-.filter-select {
-  padding: 6px 10px; border: 1px solid #d1d5e0; border-radius: 6px;
-  background: #fff; font-size: 13px; color: #1a1a2e; cursor: pointer; min-width: 130px;
-  outline: none; transition: border-color 0.15s;
-}
-.filter-select:focus { border-color: #7986cb; }
+.filter-select { min-width: 140px; }
 
 /* Body */
 .page-body { padding: 20px 24px; }
-.card {
-  background: #fff; border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 20px;
+
+.chart-card :deep(.p-card-title) {
+  font-size: 14px; font-weight: 600; color: #2d3460; margin-bottom: 12px;
 }
-.card-title { font-size: 14px; font-weight: 600; color: #2d3460; margin-bottom: 12px; }
+
 .chart-area { height: 400px; }
 
 .state-center {
   height: 400px; display: flex; align-items: center;
-  justify-content: center; gap: 8px; color: #6b7399; font-size: 14px;
+  justify-content: center; gap: 10px; color: #6b7399; font-size: 14px;
 }
-.state-error { color: #e57373; }
-
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid #e8eaf6; border-top-color: #7986cb;
-  border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+.state-error { color: #e57373; height: 200px; }
 </style>

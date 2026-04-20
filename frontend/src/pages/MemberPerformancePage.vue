@@ -10,75 +10,89 @@
     <div class="filter-bar">
       <div class="filter-field">
         <label class="filter-label">YEAR</label>
-        <select class="filter-select" v-model="year">
-          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-        </select>
+        <Select
+          v-model="year"
+          :options="yearOptions"
+          class="filter-select"
+        />
       </div>
       <div class="filter-field">
         <label class="filter-label">DEPARTMENT</label>
-        <select class="filter-select" v-model="departmentId">
-          <option :value="null">All Departments</option>
-          <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-        </select>
+        <Select
+          v-model="departmentId"
+          :options="departments"
+          option-label="name"
+          option-value="id"
+          placeholder="All Departments"
+          show-clear
+          class="filter-select"
+        />
       </div>
     </div>
 
     <!-- Table -->
     <div class="page-body">
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Issues Handled Per Member (Monthly)</span>
-          <span v-if="data" class="card-meta">{{ data.meta?.totalRows }} members</span>
-        </div>
+      <Card>
+        <template #title>
+          <div class="card-header-row">
+            <span>Issues Handled Per Member (Monthly)</span>
+            <span v-if="data" class="card-meta">{{ data.meta?.totalRows }} members</span>
+          </div>
+        </template>
+        <template #content>
+          <div v-if="loading" class="state-center">
+            <ProgressSpinner style="width:36px;height:36px" strokeWidth="4" />
+            <span>Loading...</span>
+          </div>
+          <div v-else-if="error" class="state-center state-error">{{ error }}</div>
 
-        <div v-if="loading" class="state-center">
-          <span class="spinner" /> Loading...
-        </div>
-        <div v-else-if="error" class="state-center state-error">{{ error }}</div>
-
-        <div v-else-if="data" class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th v-for="col in data.columns" :key="col.key"
-                    :class="{ 'th-center': col.type === 'number' }">
-                  {{ col.label }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in data.rows" :key="i">
-                <td v-for="col in data.columns" :key="col.key"
-                    :class="{ 'td-center': col.type === 'number', 'td-total': col.key === 'total' }">
-                  <template v-if="col.type === 'number'">
-                    <span v-if="row[col.key] > 0" class="badge" :style="heatStyle(row[col.key])">
-                      {{ row[col.key] }}
-                    </span>
-                    <span v-else class="zero">—</span>
-                  </template>
-                  <template v-else>{{ row[col.key] }}</template>
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td class="foot-label">Total</td>
-                <td></td>
-                <td v-for="mk in monthCols" :key="mk" class="td-center">
-                  <b>{{ colSum(mk) }}</b>
-                </td>
-                <td class="td-center td-total"><b>{{ grandTotal }}</b></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+          <DataTable
+            v-else-if="data"
+            :value="data.rows"
+            size="small"
+            scrollable
+            scroll-height="500px"
+            class="member-table"
+          >
+            <Column
+              v-for="col in data.columns"
+              :key="col.key"
+              :field="col.key"
+              :header="col.label"
+              :header-class="col.type === 'number' ? 'th-center' : ''"
+              :body-class="col.type === 'number' ? 'td-center' : ''"
+              :footer-class="col.type === 'number' ? 'td-center' : ''"
+            >
+              <template #body="{ data: row }">
+                <template v-if="col.type === 'number'">
+                  <span
+                    v-if="row[col.key] > 0"
+                    class="badge"
+                    :style="heatStyle(row[col.key])"
+                  >{{ row[col.key] }}</span>
+                  <span v-else class="zero">—</span>
+                </template>
+                <template v-else>{{ row[col.key] }}</template>
+              </template>
+              <template #footer>
+                <span v-if="col.key === 'name'" class="foot-label">Total</span>
+                <b v-else-if="col.type === 'number'">{{ colSum(col.key) }}</b>
+              </template>
+            </Column>
+          </DataTable>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import Select          from 'primevue/select'
+import Card            from 'primevue/card'
+import DataTable       from 'primevue/datatable'
+import Column          from 'primevue/column'
+import ProgressSpinner from 'primevue/progressspinner'
 import { api } from '../api/index.js'
 
 const props = defineProps({
@@ -147,8 +161,7 @@ function heatStyle(val) {
   return { background: `rgba(89,120,204,${alpha.toFixed(2)})`, color: pct > 0.5 ? '#fff' : '#2d3460' }
 }
 
-const colSum = (mk) => data.value?.rows?.reduce((s, r) => s + (r[mk] || 0), 0) ?? 0
-const grandTotal = computed(() => data.value?.rows?.reduce((s, r) => s + (r.total || 0), 0) ?? 0)
+const colSum = (key) => data.value?.rows?.reduce((s, r) => s + (r[key] || 0), 0) ?? 0
 </script>
 
 <style scoped>
@@ -168,43 +181,32 @@ const grandTotal = computed(() => data.value?.rows?.reduce((s, r) => s + (r.tota
   font-size: 10px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: #6b7399;
 }
-.filter-select {
-  padding: 6px 10px; border: 1px solid #d1d5e0; border-radius: 6px;
-  background: #fff; font-size: 13px; color: #1a1a2e; cursor: pointer; min-width: 150px;
-  outline: none; transition: border-color 0.15s;
-}
-.filter-select:focus { border-color: #7986cb; }
+.filter-select { min-width: 150px; }
 
 /* Body */
 .page-body { padding: 20px 24px; }
-.card {
-  background: #fff; border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 20px;
+
+.card-header-row {
+  display: flex; justify-content: space-between; align-items: baseline;
 }
-.card-header {
-  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;
+.card-meta { font-size: 12px; color: #9fa8da; font-weight: 400; }
+
+/* DataTable overrides */
+.member-table :deep(.th-center),
+.member-table :deep(.td-center) { text-align: center !important; }
+
+.member-table :deep(th) {
+  font-size: 11px !important; font-weight: 700 !important;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  white-space: nowrap; min-width: 52px;
 }
-.card-title { font-size: 14px; font-weight: 600; color: #2d3460; }
-.card-meta  { font-size: 12px; color: #9fa8da; }
+.member-table :deep(td) { white-space: nowrap; font-size: 13px; }
 
-/* Table */
-.table-wrap { overflow-x: auto; max-height: 540px; overflow-y: auto; }
-
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-
-thead th {
-  position: sticky; top: 0; z-index: 1;
-  background: #f5f6fb; padding: 8px 10px;
-  text-align: left; font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.5px; color: #6b7399;
-  white-space: nowrap; border-bottom: 2px solid #e8eaf6;
+/* Footer row */
+.member-table :deep(tfoot td) {
+  background: #f0f2fb !important; font-size: 12.5px;
 }
-.th-center { text-align: center; min-width: 52px; }
-
-tbody tr:hover { background: #f8f9fe; }
-tbody td { padding: 7px 10px; border-bottom: 1px solid #f0f2f5; white-space: nowrap; color: #2d3460; }
-.td-center { text-align: center; }
-.td-total  { font-weight: 700; }
+.foot-label { color: #6b7399; font-weight: 700; }
 
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 4px;
@@ -212,23 +214,10 @@ tbody td { padding: 7px 10px; border-bottom: 1px solid #f0f2f5; white-space: now
 }
 .zero { color: #c5cae9; }
 
-tfoot td {
-  background: #f0f2fb; border-top: 2px solid #e8eaf6;
-  padding: 7px 10px; font-size: 12.5px; color: #2d3460;
-}
-.foot-label { color: #6b7399; font-weight: 700; }
-
 /* States */
 .state-center {
   height: 200px; display: flex; align-items: center;
-  justify-content: center; gap: 8px; color: #6b7399; font-size: 14px;
+  justify-content: center; gap: 10px; color: #6b7399; font-size: 14px;
 }
 .state-error { color: #e57373; }
-
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid #e8eaf6; border-top-color: #7986cb;
-  border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>
