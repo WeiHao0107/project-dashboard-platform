@@ -25,24 +25,58 @@ const props = defineProps({
 const chartEl = ref(null)
 let chart     = null
 
+const COLOR_CREATED  = '#ef4444'   // red
+const COLOR_RESOLVED = '#22c55e'   // green
+const COLOR_RED_BAND   = 'rgba(239,68,68,0.18)'
+const COLOR_GREEN_BAND = 'rgba(34,197,94,0.18)'
+
 function buildOption(data) {
   if (!data?.series) return {}
   const cfg = props.definition.displayConfig || {}
+
+  const xData    = data.series[0]?.data.map(p => p.x) || []
+  const cValues  = data.series[0]?.data.map(p => p.y) || []
+  const rValues  = data.series[1]?.data.map(p => p.y) || []
+
+  // Compute per-point: floor = min(c,r), red delta, green delta
+  const floorVals = cValues.map((c, i) => Math.min(c, rValues[i]))
+  const redDelta  = cValues.map((c, i) => Math.max(0, c - rValues[i]))
+  const greenDelta = rValues.map((r, i) => Math.max(0, r - cValues[i]))
+
+  // Invisible band series — needed so areaStyle fills from floor up
+  const bandBase = (stackName) => ({
+    type: 'line', data: floorVals,
+    stack: stackName, silent: true, legendHoverLink: false,
+    symbol: 'none', lineStyle: { opacity: 0 },
+    areaStyle: { color: 'transparent' },
+    tooltip: { show: false },
+  })
 
   return {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
+      // Only show the two real series in tooltip
+      formatter(params) {
+        const real = params.filter(p => p.seriesName === 'Created' || p.seriesName === 'Resolved')
+        if (!real.length) return ''
+        let html = `<b>${real[0].axisValue}</b><br/>`
+        real.forEach(p => {
+          html += `${p.marker} ${p.seriesName}: <b>${p.value}</b><br/>`
+        })
+        return html
+      },
     },
     legend: {
       show: cfg.showLegend ?? true,
       bottom: 0,
+      data: ['Created', 'Resolved'],
       textStyle: { color: '#6b7399' },
     },
-    grid: { top: 20, left: 50, right: 20, bottom: 40 },
+    grid: { top: 30, left: 55, right: 20, bottom: 45 },
     xAxis: {
       type: 'category',
-      data: data.series[0]?.data.map(p => p.x) || [],
+      data: xData,
       axisLine:  { lineStyle: { color: '#d1d5e0' } },
       axisLabel: { color: '#6b7399', fontSize: 12 },
       name: cfg.xAxisLabel,
@@ -54,28 +88,48 @@ function buildOption(data) {
       splitLine: { lineStyle: { color: '#f0f2f5' } },
       axisLabel: { color: '#6b7399', fontSize: 12 },
       name: cfg.yAxisLabel,
-      nameTextStyle: { color: '#6b7399' },
+      nameTextStyle: { color: '#6b7399', padding: [0, 0, 0, -10] },
     },
-    series: data.series.map((s, i) => ({
-      name: s.name,
-      type: 'line',
-      smooth: true,
-      data: s.data.map(p => p.y),
-      symbol: 'circle',
-      symbolSize: 5,
-      lineStyle: { width: 2.5 },
-      itemStyle: { color: (cfg.colors || ['#5470c6', '#91cc75'])[i] },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: ((cfg.colors || ['#5470c6', '#91cc75'])[i]) + '33' },
-            { offset: 1, color: 'transparent' },
-          ],
-        },
+    series: [
+      // ── Red band (created > resolved region) ──
+      bandBase('red'),
+      {
+        type: 'line', data: redDelta,
+        stack: 'red', silent: true, legendHoverLink: false,
+        symbol: 'none', lineStyle: { opacity: 0 },
+        areaStyle: { color: COLOR_RED_BAND },
+        tooltip: { show: false },
       },
-    })),
+      // ── Green band (resolved > created region) ──
+      bandBase('green'),
+      {
+        type: 'line', data: greenDelta,
+        stack: 'green', silent: true, legendHoverLink: false,
+        symbol: 'none', lineStyle: { opacity: 0 },
+        areaStyle: { color: COLOR_GREEN_BAND },
+        tooltip: { show: false },
+      },
+      // ── Created line (red) ──
+      {
+        name: 'Created',
+        type: 'line',
+        data: cValues,
+        smooth: true,
+        symbol: 'circle', symbolSize: 5,
+        lineStyle: { color: COLOR_CREATED, width: 2.5 },
+        itemStyle: { color: COLOR_CREATED },
+      },
+      // ── Resolved line (green) ──
+      {
+        name: 'Resolved',
+        type: 'line',
+        data: rValues,
+        smooth: true,
+        symbol: 'circle', symbolSize: 5,
+        lineStyle: { color: COLOR_RESOLVED, width: 2.5 },
+        itemStyle: { color: COLOR_RESOLVED },
+      },
+    ],
   }
 }
 
