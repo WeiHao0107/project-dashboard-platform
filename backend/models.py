@@ -10,15 +10,15 @@ from database import Base
 class Project(Base):
     __tablename__ = "projects"
 
-    id         = Column(Integer, primary_key=True, index=True)
-    key        = Column(String(50), unique=True, nullable=False, index=True)
-    name       = Column(String(255), nullable=False)
+    id          = Column(Integer, primary_key=True, index=True)
+    key         = Column(String(50), unique=True, nullable=False, index=True)
+    name        = Column(String(255), nullable=False)
     description = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at  = Column(DateTime, default=datetime.utcnow)
 
     departments = relationship("Department", back_populates="project")
     issues      = relationship("Issue", back_populates="project")
-    pages       = relationship("CustomPageDefinition", back_populates="project")
+    pages       = relationship("CustomPage", back_populates="project")
 
 
 class Department(Base):
@@ -63,21 +63,21 @@ class Issue(Base):
     assignee = relationship("Member", back_populates="issues")
 
 
-class CustomPageDefinition(Base):
-    __tablename__ = "custom_page_definitions"
+class CustomPage(Base):
+    """
+    Simplified: just stores the list of pages per project.
+    Layout and widgets are defined directly in Vue components.
+    """
+    __tablename__ = "custom_pages"
 
-    id               = Column(Integer, primary_key=True, index=True)
-    project_id       = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    page_key         = Column(String(100), nullable=False)
-    page_name        = Column(String(255), nullable=False)
-    description      = Column(Text)
-    icon             = Column(String(50))
-    layout_config    = Column(JSON, nullable=False, default=list)
-    default_filters  = Column(JSON, nullable=False, default=dict)
-    available_filters = Column(JSON, nullable=False, default=list)
-    is_active        = Column(Boolean, default=True)
-    sort_order       = Column(Integer, default=0)
-    created_at       = Column(DateTime, default=datetime.utcnow)
+    id         = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    page_key   = Column(String(100), nullable=False)   # matches Vue component key
+    page_name  = Column(String(255), nullable=False)
+    icon       = Column(String(50))
+    sort_order = Column(Integer, default=0)
+    is_active  = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="pages")
 
@@ -85,11 +85,10 @@ class CustomPageDefinition(Base):
 class WidgetDataSourceRegistry(Base):
     __tablename__ = "widget_data_source_registry"
 
-    id               = Column(Integer, primary_key=True, index=True)
-    source_key       = Column(String(100), unique=True, nullable=False)
-    source_name      = Column(String(255), nullable=False)
-    description      = Column(Text)
-    backend_handler  = Column(String(255), nullable=False)
+    id                = Column(Integer, primary_key=True, index=True)
+    source_key        = Column(String(100), unique=True, nullable=False)
+    source_name       = Column(String(255), nullable=False)
+    description       = Column(Text)
+    backend_handler   = Column(String(255), nullable=False)
     supported_filters = Column(JSON, default=list)
-    output_schema    = Column(JSON, default=dict)
-    is_active        = Column(Boolean, default=True)
+    is_active         = Column(Boolean, default=True)

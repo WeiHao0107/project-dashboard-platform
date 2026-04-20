@@ -1,6 +1,5 @@
 """
-Seed script – generates fake data for the dashboard platform.
-Run once: python seed.py
+Seed script – run once: python seed.py
 """
 import random
 from datetime import datetime, timedelta
@@ -8,10 +7,11 @@ from datetime import datetime, timedelta
 from database import engine, SessionLocal, Base
 from models import (
     Project, Department, Member, Issue,
-    CustomPageDefinition, WidgetDataSourceRegistry,
+    CustomPage, WidgetDataSourceRegistry,
 )
 
 random.seed(42)
+
 
 # ── helpers ──────────────────────────────────────────────
 
@@ -33,60 +33,16 @@ ISSUE_TITLES = [
     "Fix cache invalidation bug", "Add API versioning", "Improve test coverage",
 ]
 
-STATUSES = ["open", "in_progress", "done", "closed"]
-PRIORITIES = ["low", "medium", "high", "critical"]
+MONTHLY_WEIGHTS = [0.8, 0.7, 1.0, 1.1, 1.2, 1.0, 0.9, 0.8, 1.1, 1.2, 1.1, 0.7]
 
 
-# ── page definitions ─────────────────────────────────────
+# ── page list (simple — no layout config) ────────────────
 
 PAGES = [
-    {
-        "page_key": "issue-trend",
-        "page_name": "Issue Trend",
-        "description": "Created vs Resolved issues over time",
-        "icon": "chart-line",
-        "available_filters": ["year", "department"],
-        "default_filters": {"year": 2025},
-        "sort_order": 0,
-        "layout_config": [
-            {
-                "widgetId": "trend-chart",
-                "type": "line_chart",
-                "title": "Created vs Resolved Issues (Cumulative)",
-                "dataSource": "issue_created_resolved_trend",
-                "position": {"row": 0, "col": 0, "w": 12, "h": 5},
-                "displayConfig": {
-                    "colors": ["#5470c6", "#91cc75"],
-                    "xAxisLabel": "Month",
-                    "yAxisLabel": "Cumulative Count",
-                    "showLegend": True,
-                },
-            }
-        ],
-    },
-    {
-        "page_key": "member-performance",
-        "page_name": "Member Performance",
-        "description": "Monthly issue count per team member",
-        "icon": "users",
-        "available_filters": ["year", "department"],
-        "default_filters": {"year": 2025},
-        "sort_order": 1,
-        "layout_config": [
-            {
-                "widgetId": "member-table",
-                "type": "table",
-                "title": "Issues Handled Per Member (Monthly)",
-                "dataSource": "member_monthly_summary",
-                "position": {"row": 0, "col": 0, "w": 12, "h": 8},
-                "displayConfig": {
-                    "sortBy": "total",
-                    "sortOrder": "desc",
-                },
-            }
-        ],
-    },
+    {"page_key": "issue-trend",        "page_name": "Issue Trend",        "icon": "chart-line", "sort_order": 0},
+    {"page_key": "member-performance", "page_name": "Member Performance", "icon": "users",      "sort_order": 1},
 ]
+
 
 # ── data source registry ──────────────────────────────────
 
@@ -94,10 +50,9 @@ DATA_SOURCES = [
     {
         "source_key": "issue_created_resolved_trend",
         "source_name": "Issue Created vs Resolved Trend",
-        "description": "Monthly created and resolved issue counts",
+        "description": "Cumulative monthly created and resolved issue counts",
         "backend_handler": "IssueTrendHandler",
         "supported_filters": ["year", "departmentId"],
-        "output_schema": {"type": "timeseries", "series": ["created", "resolved"]},
     },
     {
         "source_key": "member_monthly_summary",
@@ -105,9 +60,9 @@ DATA_SOURCES = [
         "description": "Issues resolved per member per month",
         "backend_handler": "MemberMonthlySummaryHandler",
         "supported_filters": ["year", "departmentId"],
-        "output_schema": {"type": "pivot_table", "dimensions": ["member", "month"]},
     },
 ]
+
 
 # ── project / department / member data ───────────────────
 
@@ -117,18 +72,9 @@ PROJECTS_DATA = [
         "name": "Platform Team",
         "description": "Core platform infrastructure and services",
         "departments": [
-            {
-                "name": "Backend",
-                "members": ["Alice Chen", "Bob Wang", "Carol Liu", "David Zhang"],
-            },
-            {
-                "name": "Frontend",
-                "members": ["Eve Lin", "Frank Huang", "Grace Wu"],
-            },
-            {
-                "name": "DevOps",
-                "members": ["Henry Chou", "Iris Tsai"],
-            },
+            {"name": "Backend",  "members": ["Alice Chen", "Bob Wang", "Carol Liu", "David Zhang"]},
+            {"name": "Frontend", "members": ["Eve Lin", "Frank Huang", "Grace Wu"]},
+            {"name": "DevOps",   "members": ["Henry Chou", "Iris Tsai"]},
         ],
     },
     {
@@ -136,18 +82,9 @@ PROJECTS_DATA = [
         "name": "Mobile App",
         "description": "iOS and Android mobile application",
         "departments": [
-            {
-                "name": "iOS",
-                "members": ["Jack Lee", "Kate Chen", "Leo Yang"],
-            },
-            {
-                "name": "Android",
-                "members": ["Mia Wang", "Nathan Liu", "Olivia Ho"],
-            },
-            {
-                "name": "QA",
-                "members": ["Paul Cheng", "Quinn Xu"],
-            },
+            {"name": "iOS",     "members": ["Jack Lee", "Kate Chen", "Leo Yang"]},
+            {"name": "Android", "members": ["Mia Wang", "Nathan Liu", "Olivia Ho"]},
+            {"name": "QA",      "members": ["Paul Cheng", "Quinn Xu"]},
         ],
     },
     {
@@ -155,103 +92,66 @@ PROJECTS_DATA = [
         "name": "Data Analytics",
         "description": "Data pipeline and analytics platform",
         "departments": [
-            {
-                "name": "Data Engineering",
-                "members": ["Rachel Sun", "Sam Liao", "Tina Kuo", "Uma Chen"],
-            },
-            {
-                "name": "Data Science",
-                "members": ["Victor Hsu", "Wendy Pan", "Xavier Luo"],
-            },
+            {"name": "Data Engineering", "members": ["Rachel Sun", "Sam Liao", "Tina Kuo", "Uma Chen"]},
+            {"name": "Data Science",     "members": ["Victor Hsu", "Wendy Pan", "Xavier Luo"]},
         ],
     },
 ]
 
 
-# ── monthly creation weight (makes trend more realistic) ──
-# index 0 = Jan ... 11 = Dec
-MONTHLY_WEIGHTS = [0.8, 0.7, 1.0, 1.1, 1.2, 1.0, 0.9, 0.8, 1.1, 1.2, 1.1, 0.7]
-
-
 def generate_issues(project: Project, members: list[Member], year: int, base_count: int):
-    issues = []
-    issue_counter = 1
-
+    issues, counter = [], 1
     for month_idx in range(12):
         month = month_idx + 1
         n = max(1, int(base_count * MONTHLY_WEIGHTS[month_idx] + random.randint(-3, 3)))
-        month_start = datetime(year, month, 1)
-        if month == 12:
-            month_end = datetime(year, 12, 31, 23, 59, 59)
-        else:
-            month_end = datetime(year, month + 1, 1) - timedelta(seconds=1)
-
+        m_start = datetime(year, month, 1)
+        m_end   = datetime(year, 12, 31, 23, 59, 59) if month == 12 \
+                  else datetime(year, month + 1, 1) - timedelta(seconds=1)
         for _ in range(n):
-            created = random_date(month_start, month_end)
+            created  = random_date(m_start, m_end)
             assignee = random.choice(members) if members else None
-
-            # ~85% resolved
-            resolved_at = None
-            status = random.choices(
+            status   = random.choices(
                 ["open", "in_progress", "done", "closed"],
                 weights=[5, 10, 60, 25],
             )[0]
+            resolved_at = None
             if status in ("done", "closed"):
-                days_to_resolve = random.randint(1, 25)
-                resolved_at = created + timedelta(days=days_to_resolve)
-                # ensure resolved date doesn't exceed end of next month
-                max_resolve = month_end + timedelta(days=30)
-                if resolved_at > max_resolve:
-                    resolved_at = max_resolve
-
-            issues.append(
-                Issue(
-                    project_id=project.id,
-                    assignee_id=assignee.id if assignee else None,
-                    issue_key=f"{project.key}-{issue_counter}",
-                    title=random.choice(ISSUE_TITLES),
-                    status=status,
-                    priority=random.choice(PRIORITIES),
-                    created_at=created,
-                    resolved_at=resolved_at,
-                )
-            )
-            issue_counter += 1
-
+                resolved_at = created + timedelta(days=random.randint(1, 25))
+                if resolved_at > m_end + timedelta(days=30):
+                    resolved_at = m_end + timedelta(days=30)
+            issues.append(Issue(
+                project_id=project.id,
+                assignee_id=assignee.id if assignee else None,
+                issue_key=f"{project.key}-{counter}",
+                title=random.choice(ISSUE_TITLES),
+                status=status,
+                priority=random.choice(["low", "medium", "high", "critical"]),
+                created_at=created,
+                resolved_at=resolved_at,
+            ))
+            counter += 1
     return issues
 
-
-# ── main ─────────────────────────────────────────────────
 
 def seed():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-
     db = SessionLocal()
 
-    # data sources
     for ds in DATA_SOURCES:
         db.add(WidgetDataSourceRegistry(**ds))
     db.flush()
 
-    all_members_by_project: dict[str, list[Member]] = {}
-
     for proj_data in PROJECTS_DATA:
-        project = Project(
-            key=proj_data["key"],
-            name=proj_data["name"],
-            description=proj_data["description"],
-        )
+        project = Project(key=proj_data["key"], name=proj_data["name"], description=proj_data["description"])
         db.add(project)
         db.flush()
 
-        all_members: list[Member] = []
-
+        all_members = []
         for dept_data in proj_data["departments"]:
             dept = Department(project_id=project.id, name=dept_data["name"])
             db.add(dept)
             db.flush()
-
             for mname in dept_data["members"]:
                 m = Member(
                     department_id=dept.id,
@@ -262,36 +162,17 @@ def seed():
                 db.flush()
                 all_members.append(m)
 
-        all_members_by_project[proj_data["key"]] = all_members
-
-        # pages
         for page_data in PAGES:
-            page = CustomPageDefinition(
-                project_id=project.id,
-                page_key=page_data["page_key"],
-                page_name=page_data["page_name"],
-                description=page_data["description"],
-                icon=page_data["icon"],
-                layout_config=page_data["layout_config"],
-                default_filters=page_data["default_filters"],
-                available_filters=page_data["available_filters"],
-                sort_order=page_data["sort_order"],
-            )
-            db.add(page)
+            db.add(CustomPage(project_id=project.id, **page_data))
 
-        # issues – 2024 and 2025
         base = {"PLATFORM": 18, "MOBILE": 15, "ANALYTICS": 12}[proj_data["key"]]
-        for year in [2024, 2025]:
-            issues = generate_issues(project, all_members, year, base)
-            for iss in issues:
+        for year in [2024, 2025, 2026]:
+            for iss in generate_issues(project, all_members, year, base):
                 db.add(iss)
 
     db.commit()
     db.close()
-
     print("✅ Seed completed.")
-    for key, members in all_members_by_project.items():
-        print(f"  {key}: {len(members)} members")
 
 
 if __name__ == "__main__":

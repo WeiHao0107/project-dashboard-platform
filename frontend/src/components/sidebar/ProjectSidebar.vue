@@ -1,41 +1,101 @@
 <template>
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <span class="sidebar-logo">📊</span>
-      <span class="sidebar-title">Dashboard</span>
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <span class="logo-icon">📊</span>
+      <span class="logo-text">Dashboard</span>
     </div>
 
-    <div class="sidebar-section-label">Projects</div>
+    <!-- ── PROJECT LIST ── -->
+    <div class="section-label">Projects</div>
 
-    <div v-if="loading" class="sidebar-loading">Loading...</div>
-    <div v-else-if="error" class="sidebar-error">{{ error }}</div>
+    <div v-if="loading" class="sidebar-hint">Loading...</div>
+    <div v-else-if="error"  class="sidebar-hint error">{{ error }}</div>
 
-    <nav v-else class="sidebar-nav">
-      <ProjectItem
-        v-for="project in projects"
-        :key="project.key"
-        :project="project"
-        :is-active="selectedProjectKey === project.key"
-        :active-page-id="selectedPageId"
-        @select="$emit('select-project', project.key)"
-        @select-page="(pageId) => $emit('select-page', pageId)"
-      />
+    <nav v-else class="project-list">
+      <button
+        v-for="proj in projects"
+        :key="proj.key"
+        class="project-btn"
+        :class="{ active: selectedProjectKey === proj.key }"
+        @click="selectProject(proj.key)"
+      >
+        <span class="project-initial">{{ proj.name[0] }}</span>
+        <span class="project-name">{{ proj.name }}</span>
+        <span v-if="selectedProjectKey === proj.key" class="project-check">✓</span>
+      </button>
     </nav>
+
+    <!-- ── PAGE LIST (only shown when a project is selected) ── -->
+    <template v-if="selectedProjectKey && pages.length">
+      <div class="divider" />
+      <div class="section-label">Pages</div>
+      <nav class="page-list">
+        <button
+          v-for="page in pages"
+          :key="page.pageId"
+          class="page-btn"
+          :class="{ active: selectedPageId === page.pageId }"
+          @click="$emit('select-page', page.pageId)"
+        >
+          <span class="page-icon">{{ PAGE_ICONS[page.icon] ?? '📄' }}</span>
+          {{ page.title }}
+        </button>
+      </nav>
+    </template>
+
+    <div v-else-if="selectedProjectKey && pagesLoading" class="sidebar-hint">
+      Loading pages...
+    </div>
   </aside>
 </template>
 
 <script setup>
-import ProjectItem from './ProjectItem.vue'
+import { ref, watch } from 'vue'
+import { api } from '../../api/index.js'
 
-defineProps({
-  projects:           { type: Array,  default: () => [] },
+const PAGE_ICONS = {
+  'chart-line': '📈',
+  'users':      '👥',
+  'table':      '📋',
+  'bar-chart':  '📊',
+}
+
+const props = defineProps({
+  projects:           { type: Array,   default: () => [] },
   loading:            { type: Boolean, default: false },
   error:              { type: String,  default: null },
   selectedProjectKey: { type: String,  default: null },
   selectedPageId:     { type: String,  default: null },
 })
 
-defineEmits(['select-project', 'select-page'])
+const emit = defineEmits(['select-project', 'select-page'])
+
+const pages       = ref([])
+const pagesLoading = ref(false)
+
+async function loadPages(key) {
+  if (!key) { pages.value = []; return }
+  pagesLoading.value = true
+  try {
+    pages.value = (await api.getPages(key)).data
+    // Auto-select first page
+    if (pages.value.length > 0 && !props.selectedPageId) {
+      emit('select-page', pages.value[0].pageId)
+    }
+  } finally {
+    pagesLoading.value = false
+  }
+}
+
+function selectProject(key) {
+  emit('select-project', key)
+}
+
+watch(() => props.selectedProjectKey, (key) => {
+  pages.value = []
+  loadPages(key)
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -47,41 +107,102 @@ defineEmits(['select-project', 'select-page'])
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 
-.sidebar-header {
+/* Logo */
+.sidebar-logo {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 16px 16px;
+  padding: 18px 16px 14px;
   border-bottom: 1px solid #2d3250;
 }
+.logo-icon { font-size: 20px; }
+.logo-text  { font-size: 16px; font-weight: 700; color: #e8eaf6; }
 
-.sidebar-logo { font-size: 20px; }
-
-.sidebar-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #e8eaf6;
-  letter-spacing: 0.3px;
-}
-
-.sidebar-section-label {
+/* Section label */
+.section-label {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
   color: #6b7399;
-  padding: 16px 16px 6px;
+  padding: 14px 16px 6px;
 }
 
-.sidebar-nav { flex: 1; overflow-y: auto; }
+/* Project list */
+.project-list { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
 
-.sidebar-loading,
-.sidebar-error {
-  padding: 12px 16px;
+.project-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: #a8b0d0;
   font-size: 13px;
-  color: #6b7399;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  width: 100%;
 }
-.sidebar-error { color: #e57373; }
+.project-btn:hover  { background: #272d48; color: #e8eaf6; }
+.project-btn.active { background: #2d3460; color: #fff; font-weight: 600; }
+
+.project-initial {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: #3d4570;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9fa8da;
+  flex-shrink: 0;
+}
+.project-btn.active .project-initial {
+  background: #5c6bc0;
+  color: #fff;
+}
+.project-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-check { font-size: 11px; color: #7986cb; }
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: #2d3250;
+  margin: 10px 0 0;
+}
+
+/* Page list */
+.page-list { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 12px; }
+
+.page-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: #8890b0;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  width: 100%;
+}
+.page-btn:hover  { background: #272d48; color: #e8eaf6; }
+.page-btn.active { background: #272d48; color: #9fa8da; font-weight: 600; }
+
+.page-icon { font-size: 14px; }
+
+/* Hints */
+.sidebar-hint { padding: 8px 16px; font-size: 12px; color: #6b7399; }
+.sidebar-hint.error { color: #e57373; }
 </style>

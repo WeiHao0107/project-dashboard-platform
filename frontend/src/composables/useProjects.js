@@ -8,10 +8,8 @@ export function useProjects() {
 
   async function fetchProjects() {
     loading.value = true
-    error.value   = null
     try {
-      const res      = await api.getProjects()
-      projects.value = res.data
+      projects.value = (await api.getProjects()).data
     } catch (e) {
       error.value = e.message
     } finally {
@@ -20,6 +18,5 @@ export function useProjects() {
   }
 
   onMounted(fetchProjects)
-
   return { projects, loading, error }
 }

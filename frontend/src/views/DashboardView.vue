@@ -1,62 +1,92 @@
 <template>
-  <div class="dashboard-layout">
+  <div class="layout">
     <ProjectSidebar
       :projects="projects"
       :loading="loading"
       :error="error"
       :selected-project-key="selectedProjectKey"
       :selected-page-id="selectedPageId"
-      @select-project="selectProject"
-      @select-page="selectPage"
+      @select-project="onSelectProject"
+      @select-page="onSelectPage"
     />
 
-    <main class="dashboard-main">
-      <PageRenderer
+    <main class="main">
+      <!-- Render the dedicated page component by page key -->
+      <component
+        v-if="currentPageComponent && selectedProjectKey"
+        :is="currentPageComponent"
         :project-key="selectedProjectKey"
-        :page-id="selectedPageId"
+        :key="selectedProjectKey + '-' + selectedPageId"
       />
+
+      <!-- Empty state -->
+      <div v-else class="empty-state">
+        <div class="empty-icon">📊</div>
+        <p>Select a project and page from the sidebar</p>
+      </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import ProjectSidebar from '../components/sidebar/ProjectSidebar.vue'
-import PageRenderer   from '../components/pages/PageRenderer.vue'
-import { useProjects } from '../composables/useProjects.js'
+import { ref, computed, watch } from 'vue'
+import ProjectSidebar       from '../components/sidebar/ProjectSidebar.vue'
+import IssueTrendPage        from '../pages/IssueTrendPage.vue'
+import MemberPerformancePage from '../pages/MemberPerformancePage.vue'
+import { useProjects }       from '../composables/useProjects.js'
+
+// ── page key → Vue component mapping ─────────────────────
+const PAGE_MAP = {
+  'issue-trend':        IssueTrendPage,
+  'member-performance': MemberPerformancePage,
+}
 
 const { projects, loading, error } = useProjects()
 
 const selectedProjectKey = ref(null)
 const selectedPageId     = ref(null)
 
-// Auto-select first project once loaded
+// Auto-select first project once list loads
 watch(projects, (list) => {
   if (list.length > 0 && !selectedProjectKey.value) {
     selectedProjectKey.value = list[0].key
   }
 }, { immediate: true })
 
-function selectProject(key) {
-  if (selectedProjectKey.value === key) return   // already active, no reset
+function onSelectProject(key) {
+  if (selectedProjectKey.value === key) return
   selectedProjectKey.value = key
-  selectedPageId.value     = null                // clear page; ProjectItem will auto-select first
+  selectedPageId.value     = null    // sidebar will auto-select first page
 }
 
-function selectPage(pageId) {
+function onSelectPage(pageId) {
   selectedPageId.value = pageId
 }
+
+const currentPageComponent = computed(() =>
+  selectedPageId.value ? (PAGE_MAP[selectedPageId.value] ?? null) : null
+)
 </script>
 
 <style scoped>
-.dashboard-layout {
-  display: flex;
-  min-height: 100vh;
-}
-.dashboard-main {
+.layout { display: flex; min-height: 100vh; }
+
+.main {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #9fa8da;
+}
+.empty-icon { font-size: 48px; }
+.empty-state p { font-size: 15px; }
 </style>

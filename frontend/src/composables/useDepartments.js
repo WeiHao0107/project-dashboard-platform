@@ -3,25 +3,16 @@ import { api } from '../api/index.js'
 
 export function useDepartments(projectKey) {
   const departments = ref([])
-  const loading     = ref(false)
 
-  async function fetchDepartments() {
-    if (!projectKey.value) {
-      departments.value = []
-      return
-    }
-    loading.value = true
+  async function fetch() {
+    if (!projectKey.value) { departments.value = []; return }
     try {
-      const res         = await api.getDepartments(projectKey.value)
-      departments.value = res.data
+      departments.value = (await api.getDepartments(projectKey.value)).data
     } catch {
       departments.value = []
-    } finally {
-      loading.value = false
     }
   }
 
-  watch(projectKey, fetchDepartments, { immediate: true })
-
-  return { departments, loading }
+  watch(projectKey, fetch, { immediate: true })
+  return { departments }
 }
