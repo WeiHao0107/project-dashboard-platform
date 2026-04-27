@@ -10,7 +10,7 @@
     <div class="filter-bar">
       <div class="filter-field">
         <label class="filter-label">YEAR</label>
-        <Select
+        <p-select
           v-model="year"
           :options="yearOptions"
           class="filter-select"
@@ -18,7 +18,7 @@
       </div>
       <div class="filter-field">
         <label class="filter-label">DEPARTMENT</label>
-        <Select
+        <p-select
           v-model="departmentId"
           :options="departments"
           option-label="name"
@@ -32,26 +32,23 @@
 
     <!-- Chart -->
     <div class="page-body">
-      <Card class="chart-card">
+      <p-card class="chart-card">
         <template #title>Created vs Resolved Issues (Cumulative)</template>
         <template #content>
           <div v-if="loading" class="state-center">
-            <ProgressSpinner style="width:36px;height:36px" strokeWidth="4" />
+            <p-progress-spinner style="width:36px;height:36px" strokeWidth="4" />
             <span>Loading...</span>
           </div>
           <div v-else-if="error" class="state-center state-error">{{ error }}</div>
           <div v-else ref="chartEl" class="chart-area" />
         </template>
-      </Card>
+      </p-card>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import Select         from 'primevue/select'
-import Card           from 'primevue/card'
-import ProgressSpinner from 'primevue/progressspinner'
 import * as echarts from 'echarts'
 import { api } from '../api/index.js'
 
@@ -88,10 +85,9 @@ async function fetchData() {
   loading.value = true
   error.value   = null
   try {
-    const res = await api.queryData({
-      projectKey: props.projectKey,
-      dataSource: 'issue_created_resolved_trend',
-      filters: { year: year.value, departmentId: departmentId.value },
+    const res = await api.getIssueTrend(props.projectKey, {
+      year: year.value,
+      departmentId: departmentId.value,
     })
     data.value = res.data
   } catch (e) {

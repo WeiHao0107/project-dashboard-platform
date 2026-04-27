@@ -10,7 +10,7 @@
     <div class="filter-bar">
       <div class="filter-field">
         <label class="filter-label">YEAR</label>
-        <Select
+        <p-select
           v-model="year"
           :options="yearOptions"
           class="filter-select"
@@ -18,7 +18,7 @@
       </div>
       <div class="filter-field">
         <label class="filter-label">DEPARTMENT</label>
-        <Select
+        <p-select
           v-model="departmentId"
           :options="departments"
           option-label="name"
@@ -32,67 +32,29 @@
 
     <!-- Table -->
     <div class="page-body">
-      <Card>
+      <p-card>
         <template #title>
           <div class="card-header-row">
             <span>Issues Handled Per Member (Monthly)</span>
-            <span v-if="data" class="card-meta">{{ data.meta?.totalRows }} members</span>
+            <span v-if="data" class="card-meta">{{ data.length }} members</span>
           </div>
         </template>
         <template #content>
-          <div v-if="loading" class="state-center">
-            <ProgressSpinner style="width:36px;height:36px" strokeWidth="4" />
-            <span>Loading...</span>
-          </div>
-          <div v-else-if="error" class="state-center state-error">{{ error }}</div>
-
-          <DataTable
-            v-else-if="data"
-            :value="data.rows"
-            size="small"
-            scrollable
-            scroll-height="500px"
-            class="member-table"
-          >
-            <Column
-              v-for="col in data.columns"
-              :key="col.key"
-              :field="col.key"
-              :header="col.label"
-              :header-class="col.type === 'number' ? 'th-center' : ''"
-              :body-class="col.type === 'number' ? 'td-center' : ''"
-              :footer-class="col.type === 'number' ? 'td-center' : ''"
-            >
-              <template #body="{ data: row }">
-                <template v-if="col.type === 'number'">
-                  <span
-                    v-if="row[col.key] > 0"
-                    class="badge"
-                    :style="heatStyle(row[col.key])"
-                  >{{ row[col.key] }}</span>
-                  <span v-else class="zero">—</span>
-                </template>
-                <template v-else>{{ row[col.key] }}</template>
-              </template>
-              <template #footer>
-                <span v-if="col.key === 'member'" class="foot-label">Total</span>
-                <b v-else-if="col.type === 'number'">{{ colSum(col.key) }}</b>
-              </template>
-            </Column>
-          </DataTable>
+          <MemberTable
+            :columns="tableColumns"
+            :rows="data ?? []"
+            :loading="loading"
+            :error="error"
+          />
         </template>
-      </Card>
+      </p-card>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import Select          from 'primevue/select'
-import Card            from 'primevue/card'
-import DataTable       from 'primevue/datatable'
-import Column          from 'primevue/column'
-import ProgressSpinner from 'primevue/progressspinner'
+import { ref, watch } from 'vue'
+import MemberTable from '../components/table/MemberTable.vue'
 import { api } from '../api/index.js'
 
 const props = defineProps({
@@ -100,7 +62,6 @@ const props = defineProps({
 })
 
 // ── Filters ──────────────────────────────────────────────
-const ALL_MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const currentYear  = new Date().getFullYear()
 const yearOptions  = Array.from({ length: 5 }, (_, i) => currentYear - i)
 const year         = ref(currentYear)
@@ -126,12 +87,11 @@ async function fetchData() {
   loading.value = true
   error.value   = null
   try {
-    const res = await api.queryData({
-      projectKey: props.projectKey,
-      dataSource: 'member_monthly_summary',
-      filters: { year: year.value, departmentId: departmentId.value },
+    const res = await api.getMemberPerformance(props.projectKey, {
+      year: year.value,
+      departmentId: departmentId.value,
     })
-    data.value = res.data
+    data.value = res.data   // now a plain array
   } catch (e) {
     error.value = e.message
   } finally {
@@ -141,27 +101,13 @@ async function fetchData() {
 
 watch([() => props.projectKey, year, departmentId], fetchData, { immediate: true })
 
-// ── Table helpers ─────────────────────────────────────────
-const monthCols = computed(() =>
-  ALL_MONTHS.filter(m => data.value?.columns?.some(c => c.key === m))
-)
-
-const maxVal = computed(() => {
-  if (!data.value?.rows) return 1
-  let m = 0
-  for (const r of data.value.rows)
-    for (const mk of monthCols.value)
-      if (r[mk] > m) m = r[mk]
-  return m || 1
-})
-
-function heatStyle(val) {
-  const pct = val / maxVal.value
-  const alpha = 0.12 + pct * 0.55
-  return { background: `rgba(89,120,204,${alpha.toFixed(2)})`, color: pct > 0.5 ? '#fff' : '#2d3460' }
-}
-
-const colSum = (key) => data.value?.rows?.reduce((s, r) => s + (r[key] || 0), 0) ?? 0
+// Fixed column definitions (backend no longer sends columns)
+const MONTH_KEYS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const tableColumns = [
+  { key: 'member',  label: 'Member', type: 'string' },
+  ...MONTH_KEYS.map(m => ({ key: m, label: m, type: 'number' })),
+  { key: 'total',   label: 'Total',  type: 'number' },
+]
 </script>
 
 <style scoped>

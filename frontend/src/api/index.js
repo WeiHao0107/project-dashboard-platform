@@ -12,7 +12,14 @@ export const api = {
   getPages(projectKey) {
     return http.get(`/projects/${projectKey}/pages`)
   },
-  queryData({ projectKey, dataSource, filters }) {
-    return http.post('/widget-data/query', { projectKey, dataSource, filters })
+  getIssueTrend(projectKey, { year, departmentId } = {}) {
+    return http.get(`/projects/${projectKey}/issue-trend`, {
+      params: { year, departmentId },
+    })
+  },
+  getMemberPerformance(projectKey, { year, departmentId } = {}) {
+    return http.get(`/projects/${projectKey}/member-performance`, {
+      params: { year, departmentId },
+    })
   },
 }
